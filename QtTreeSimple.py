@@ -4,7 +4,7 @@ Created on Mon May  3 21:20:30 2021
 
 @author: benoi_000
 """
-from PyQt5.QtCore import QObject , pyqtSlot, QMetaObject
+from PyQt5.QtCore import QObject , pyqtSlot, QMetaObject, pyqtSignal
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTreeWidget, QTreeWidgetItem
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -12,24 +12,32 @@ from PyQt5.Qt import QStandardItemModel, QStandardItem
 import numpy as np
 import sys
 
+class QTreeWidgetItemWithID(QTreeWidgetItem):
+    """
+    This class overwrite QTreeWidgetItem to add the capability to store an ID that 
+    will be returned when the element will be selected 
+    """
+    
+    def __init__(self, text_list=[], ID=-1):
+        super(QTreeWidgetItem,self).__init__(text_list)
+        self.ID=ID
+
+
 class QtTreeSimple(QTreeWidget):
-    Items=[]
+    
+    NewElementSelected = pyqtSignal([int,'QString'])
+    
     def __init__(self):
         super().__init__()
         self.setHeaderHidden(True)
         self.itemActivated.connect(self.Print_selected_item)
-        # self.Root=QTreeWidgetItem(["z","Colone 2"])
-        # self.subItem = QTreeWidgetItem(["b","Colone 2"])
-        # self.subItem2 = QTreeWidgetItem(["c","Colone 2"])
-        # self.subItem3 = QTreeWidgetItem(["d","Colone 2"])
-        # self.subItem4 = QTreeWidgetItem(["e","Colone 2"])
-        # self.subItem5 = QTreeWidgetItem(["f","Colone 2"])
-        # self.subItem2.addChild(self.subItem3)
-        # self.subItem2.addChild(self.subItem4)
-        # self.subItem4.addChild(self.subItem5)
-        # self.Root.addChild(self.subItem)
-        # self.addTopLevelItems([self.Root,self.subItem2])
-        # self.addTopLevelItems
+        self.Items=[]
+        
+    def __init__(self, Layout):
+        super().__init__(Layout)
+        self.setHeaderHidden(True)
+        self.itemActivated.connect(self.Print_selected_item)
+        self.Items=[]
     
     def GetItem(self, Selected_Item = "self.invisibleRootItem()", list_item = []):       
         '''
@@ -73,7 +81,7 @@ class QtTreeSimple(QTreeWidget):
             list_item = [Selected_Item.text(0)]
         return list_item
     
-    def add_item_check_if_section_exist(self , name , ItemTree) :
+    def add_item_check_if_section_exist(self , name , ItemTree, ID = -1) :
         '''
         Sub function of add_item use to check if item with name exist in ItemTree. If it does
         not exist, the item is created and added to the ItemTree
@@ -97,11 +105,11 @@ class QtTreeSimple(QTreeWidget):
             if name == ItemTree.child(i).text(0):
                 return ItemTree.child(i)
         # if not fond, create a new item tree and test
-        subItem = QTreeWidgetItem([name])
+        subItem = QTreeWidgetItemWithID([name], ID)
         ItemTree.addChild(subItem)
         return subItem
     
-    def add_item(self, new_item):
+    def add_item(self, new_item, ID=-1):
         '''
         Add item to the tree. it create all the required intermediate QTreeItem 
 
@@ -118,14 +126,18 @@ class QtTreeSimple(QTreeWidget):
             new_item = new_item.split("//")
         selected_item = self.invisibleRootItem()
         for i in new_item :
-            selected_item = self.add_item_check_if_section_exist(i,selected_item)
+            if i == new_item[-1]:
+                self_ID=ID
+            else:
+                self_ID=-1
+            selected_item = self.add_item_check_if_section_exist(i,selected_item, ID = self_ID)
         self.expandAll()
         
     def Print_selected_item( self , SelectedItem, inte):
         outputstring = ""
-        
         try :
             parent=SelectedItem.parent()
+            returnedID=SelectedItem.ID
         except : 
             parent=self.invisibleRootItem()
         list_item =[]
@@ -137,11 +149,13 @@ class QtTreeSimple(QTreeWidget):
             except : 
                 parent =self.invisibleRootItem()
         list_item.reverse()
+        # create the outputstring 
         outputsting=""
         for item in list_item:
             outputstring += item +"//"
-        outputstring = outputstring[:-2]
-        print(outputstring)
+        outputstring = outputstring[:-2]#remove last //
+        # send the signal 
+        self.NewElementSelected.emit(returnedID, outputstring)
    
     
 if __name__ == "__main__":
@@ -150,7 +164,7 @@ if __name__ == "__main__":
     centralwidget = QtWidgets.QWidget(window)
     verticalLayoutWidget = QtWidgets.QWidget(centralwidget)
     verticalLayout = QtWidgets.QVBoxLayout(verticalLayoutWidget)
-    Tree=QtTreeSimple()
+    Tree=QtTreeSimple(centralwidget)
     verticalLayout.addWidget(Tree)
     window.setCentralWidget(centralwidget)
     window.show()
